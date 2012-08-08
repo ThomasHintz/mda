@@ -2,3 +2,7 @@
 *~
 /mda-server
 /sync.scm
+/mda-client.import.so
+/mda-client.o
+/mda-client.so
+/mda-client.import.scm

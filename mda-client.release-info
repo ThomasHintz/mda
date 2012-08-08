@@ -1,0 +1,4 @@
+(repo git "git://github.com/ThomasHintz/mda.git")   ; optional
+
+(uri targz "https://github.com/ThomasHintz/mda/tarball/{egg-release}")
+(release "1")

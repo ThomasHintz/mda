@@ -1,0 +1,13 @@
+; author: Thomas Hintz
+; email: t@thintz.com
+; license: bsd
+
+(
+(license "BSD")
+
+(category db)
+
+(needs zmq)
+
+(author "Thomas Hintz")
+(synopsis "Client library for tokyocabinet/zmq mda server."))

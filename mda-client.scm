@@ -27,9 +27,19 @@
 ; 	    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ; 	    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+(module mda-client
+  (;; params
+   retries timeout db:sep
+
+   ;; procs
+   db:store db:put-async db:read db:list db:update-list db:remove-from-list db:delete
+   serialize deserialize
+   )
+
+(import scheme chicken ports)
 (use zmq)
 
-(load "mda-common.scm")
+(include "mda-common.scm")
 
 (define retries (make-parameter 10))
 (define timeout (make-parameter (* 1000 100))) ; 10ms
@@ -66,7 +76,7 @@
 (define (db:store v . k)
   (do-op `(put ,(serialize v) ,@k)))
 
-(define (put-async v . k) 'not-implemented)
+(define (db:put-async v . k) 'not-implemented)
 
 (define (db:read . k)
   (do-op `(get ,@k)))
@@ -77,5 +87,10 @@
 (define (db:update-list v . k)
   (do-op `(update-list ,v ,@k)))
 
+(define (db:remove-from-list v . k)
+  (do-op `(remove-from-list ,v ,@k)))
+
 (define (db:delete . k)
   (do-op `(delete ,@k)))
+
+)

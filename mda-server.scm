@@ -127,6 +127,16 @@
 	 (ls (if (eq? l 'not-found) '() l)))
     (or (contains? ls data) (tc-store (db) (cons data ls) p))))
 
+(define (remove-from-list data . path-list)
+  (let* ((p (append path-list `(,(list-index))))
+	 (l (tc-read (db) p))
+	 (ls (if (eq? l 'not-found) '() l)))
+    (tc-store (db)
+	      (filter (lambda (e)
+			(not (equal? e data)))
+		      ls)
+	      p)))
+
 (define (db-list . path-list)
   (let ((r (tc-read (db) (append path-list `(,(list-index))))))
     (if (eq? r 'not-found)
