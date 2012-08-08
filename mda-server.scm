@@ -1,6 +1,5 @@
-#!/usr/bin/csi -script
-
-(use srfi-1 srfi-13 srfi-18 srfi-69 tokyocabinet zmq)
+(use srfi-1 srfi-13 srfi-18 srfi-69 tokyocabinet zmq ports data-structures)
+(include "mda-common.scm")
 
 ;;; utils
 
@@ -75,7 +74,7 @@
 ;;; external funcs, they wrap db calls with permission and locking protection
 
 (define (put data . path-list)
-  (tc-store (db) data path-list)
+  (tc-store (db) (deserialize data) path-list)
   'success)
 
 (define (get . path-list)
@@ -99,7 +98,7 @@
 	 (ls (if (eq? l 'not-found) '() l)))
     (or (contains? ls data) (tc-store (db) (cons data ls) p))))
 
-(define (list . path-list)
+(define (db-list . path-list)
   (let ((r (tc-read (db) (append path-list `(,(list-index))))))
     (if (eq? r 'not-found)
 	'()
@@ -127,22 +126,14 @@
 (define socket (make-parameter (make-socket 'rep)))
 (bind-socket (socket) "tcp://*:4444")
 
-;(print (store "v2" "k2"))
-;(print (read "k2"))
-
-(define (many n proc)
-  (letrec ((process (lambda (i) (if (> i n) 'done (begin (proc) (process (+ i 1)))))))
-    (process 0)))
-
-(define (perf-test n) (many n (lambda () (put "v" "k") (get "k"))))
-(define (perf-test2 n) (many n (lambda () (+ 1 2))))
-
-(print (time (perf-test2 10000)))
-
 (define (process-request)
-  (let ((msg (receive-message* (socket))))
-    (let ((proc (with-input-from-string msg (lambda () (read)))))
-      (send-message (socket) (with-output-to-string (lambda () (write (eval proc)))))))
+  (handle-exceptions
+   exn
+   (send-message (socket) (serialize `(error ,(with-output-to-string (lambda ()
+								       (print-call-chain)
+								       (print-error-message exn))))))
+   (let ((msg (serialize `(success ,(eval (deserialize (receive-message* (socket))))))))
+     (send-message (socket) msg)))
   (process-request))
 
 (process-request)
