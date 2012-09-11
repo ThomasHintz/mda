@@ -66,10 +66,11 @@
 			(begin (reconnect)
 			       (poll-loop timeout (+ retries 1) max-retries))
 			(let ((response (deserialize (receive-message* socket))))
+			  (mutex-unlock! do-op-mutex)
 			  (if (eq? (car response) 'success)
 			      (cadr response)
-			      (begin (print response) (abort (cdr response)))))))))))
-	   (poll-loop (timeout) 0 (retries))))
+			      (begin (print "server-error") (print response) (abort (cdr response)))))))))))
+    (poll-loop (timeout) 0 (retries))))
 
 (define db:sep (make-parameter "/"))
 
