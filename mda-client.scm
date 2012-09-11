@@ -36,7 +36,7 @@
    serialize deserialize
    )
 
-(import scheme chicken ports)
+(import scheme chicken ports srfi-18)
 (use zmq)
 
 (include "mda-common.scm")
@@ -55,8 +55,15 @@
   (close-socket socket)
   (setup-socket))
 
+(define do-op-mutex (make-mutex))
 (define (do-op op)
-  (send-message socket (serialize op))
+  (mutex-lock! do-op-mutex)
+  (handle-exceptions
+   exn
+   (begin (print-call-chain)
+	  (print-error-message exn)
+	  (print "client error"))
+   (send-message socket (serialize op)))
   (letrec ((poll-loop
 	    (lambda (timeout retries max-retries)
 	      (if (>= retries max-retries)
