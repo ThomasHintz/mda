@@ -41,8 +41,8 @@
 
 (include "mda-common.scm")
 
-(define retries (make-parameter 10))
-(define timeout (make-parameter (* 1000 100))) ; 10ms
+(define retries (make-parameter 15)) ; with 100ms timeout this makes the max timeout 1.5s
+(define timeout (make-parameter (* 1000 1000))) ; 100ms
 
 (define socket #f)
 

@@ -55,6 +55,9 @@
 (define (open-db path)
   (tc-hdb-open path))
 
+(define (close-db)
+  (tc-hdb-close (db)))
+
 ;;; setup tokyocabinet
 
 (define db-path (make-parameter ""))
@@ -157,6 +160,15 @@
 			  (cons k kvs)
 			  kvs))
 		    '()))))
+
+;;; close functionality
+
+
+;; (define pause-socket (make-parameter (make-socket 'rep)))
+;; (bind-socket (pause-socket) "tcp://*:4445")
+
+;; (define (process-pause)
+  
 
 ;;; setup the server
 
