@@ -1,3 +1,4 @@
+#!/usr/bin/csi
 ; author: Thomas Hintz
 ; email: t@thintz.com
 ; license: bsd
@@ -172,7 +173,8 @@
 
 ;;; setup the server
 
-(db (open-db (car (command-line-arguments))))
+;(db (open-db (car (command-line-arguments))))
+(db (open-db "ktr-db"))
 
 (define socket (make-parameter (make-socket 'rep)))
 (bind-socket (socket) "tcp://*:4444")
