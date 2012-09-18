@@ -1,5 +1,4 @@
 #!/usr/local/bin/csi
-
 ; author: Thomas Hintz
 ; email: t@thintz.com
 ; license: bsd
