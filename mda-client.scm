@@ -57,7 +57,11 @@
 
 (define do-op-mutex (make-mutex))
 (define (do-op op)
-  (mutex-lock! do-op-mutex)
+  (handle-exceptions
+   exn
+   (begin (mutex-unlock! do-op-mutex) ; mutex abandoned?
+	  (mutex-lock! do-op-mutex))
+   (mutex-lock! do-op-mutex))
   (handle-exceptions
    exn
    (begin (print-call-chain)
