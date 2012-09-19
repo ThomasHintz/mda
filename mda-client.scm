@@ -41,8 +41,8 @@
 
 (include "mda-common.scm")
 
-(define retries (make-parameter 10)) ; with 10ms timeout this makes the max timeout 100ms
-(define timeout (make-parameter (* 100 1000))) ; 10ms
+(define retries (make-parameter 3)) ; with 1s timeout this makes the max timeout 3s
+(define timeout (make-parameter (* 1000 1000 10))) ; 1000ms
 
 (define socket #f)
 
@@ -57,7 +57,11 @@
 
 (define do-op-mutex (make-mutex))
 (define (do-op op)
-  (mutex-lock! do-op-mutex)
+  (handle-exceptions
+   exn
+   (begin (mutex-unlock! do-op-mutex) ; mutex abandoned?
+	  (mutex-lock! do-op-mutex))
+   (mutex-lock! do-op-mutex))
   (handle-exceptions
    exn
    (begin (print-call-chain)
