@@ -1,4 +1,5 @@
 #!/usr/local/bin/csi
+
 ; author: Thomas Hintz
 ; email: t@thintz.com
 ; license: bsd
@@ -182,9 +183,10 @@
 (define (process-request)
   (handle-exceptions
    exn
-   (send-message (socket) (serialize `(error ,(with-output-to-string (lambda ()
+   (begin (send-message (socket) (serialize `(error ,(with-output-to-string (lambda ()
   								       (print-call-chain)
-  								       (print-error-message exn))))))
+  								       (print-error-message exn)))))))
+	  ;(with-output-to-file "query-log" (lambda () (print "error")) append:))
    (let ((query (receive-message* (socket))))
      (with-output-to-file "query-log" (lambda () (print query)) append:)
      (let ((msg (serialize `(success ,(eval (deserialize query))))))
