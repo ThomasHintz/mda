@@ -6,3 +6,4 @@
 /mda-client.o
 /mda-client.so
 /mda-client.import.scm
+/query-log
