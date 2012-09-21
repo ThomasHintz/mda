@@ -163,19 +163,18 @@
 			  kvs))
 		    '()))))
 
+(define (pause? query) (string=? query "(pause)"))
+
 ;;; close functionality
 
-
-;; (define pause-socket (make-parameter (make-socket 'rep)))
-;; (bind-socket (pause-socket) "tcp://*:4445")
-
-;; (define (process-pause)
-  
+(define open-db-socket (make-parameter (make-socket 'rep)))
+(bind-socket (open-db-socket) "tcp://*:4445")
 
 ;;; setup the server
 
 ;(db (open-db (car (command-line-arguments))))
-(db (open-db "/home/webaccess/db/ktr-db"))
+(define db-path "/home/webaccess/db/ktr-db")
+(db (open-db db-path))
 
 (define socket (make-parameter (make-socket 'rep)))
 (bind-socket (socket) "tcp://*:4444")
@@ -184,13 +183,19 @@
   (handle-exceptions
    exn
    (begin (send-message (socket) (serialize `(error ,(with-output-to-string (lambda ()
-  								       (print-call-chain)
-  								       (print-error-message exn)))))))
-	  ;(with-output-to-file "query-log" (lambda () (print "error")) append:))
+									      (print-call-chain)
+									      (print-error-message exn)))))))
+					;(with-output-to-file "query-log" (lambda () (print "error")) append:))
    (let ((query (receive-message* (socket))))
      (with-output-to-file "query-log" (lambda () (print query)) append:)
-     (let ((msg (serialize `(success ,(eval (deserialize query))))))
-       (send-message (socket) msg))))
+     (if (pause? query)
+	 (begin (close-db)
+		(send-message (socket) (serialize `(success "closed")))
+		(receive-message* (open-db-socket))
+		(db (open-db db-path))
+		(send-message (open-db-socket) "opened"))
+	 (let ((msg (serialize `(success ,(eval (deserialize query))))))
+	   (send-message (socket) msg)))))
   (process-request))
 
 (process-request)

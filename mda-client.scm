@@ -33,6 +33,7 @@
 
    ;; procs
    db:store db:put-async db:read db:list db:update-list db:remove-from-list db:delete
+   db:pause
    serialize deserialize
    )
 
@@ -104,5 +105,8 @@
 
 (define (db:delete . k)
   (do-op `(delete ,@k)))
+
+(define (db:pause)
+  (do-op `(pause)))
 
 )
