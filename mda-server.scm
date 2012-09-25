@@ -168,16 +168,17 @@
 ;;; close functionality
 
 (define open-db-socket (make-parameter (make-socket 'rep)))
-(bind-socket (open-db-socket) "tcp://*:4445")
+(bind-socket (open-db-socket) (string-append "tcp://*:" (caddr (command-line-arguments))))
+(print "db-socket: " (caddr (command-line-arguments)))
 
 ;;; setup the server
 
-;(db (open-db (car (command-line-arguments))))
-(define db-path "/home/webaccess/db/ktr-db")
-(db (open-db db-path))
+(db (open-db (car (command-line-arguments))))
+(print "db-file: " (car (command-line-arguments)))
 
 (define socket (make-parameter (make-socket 'rep)))
-(bind-socket (socket) "tcp://*:4444")
+(bind-socket (socket) (string-append "tcp://*:" (cadr (command-line-arguments))))
+(print "socket: " (cadr (command-line-arguments)))
 
 (define (process-request)
   (handle-exceptions
