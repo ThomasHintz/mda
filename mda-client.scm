@@ -38,51 +38,51 @@
    )
 
 (import scheme chicken ports srfi-18)
-(use zmq)
+(use zmq pool)
 
 (include "mda-common.scm")
 
-(define retries (make-parameter 3)) ; with 1s timeout this makes the max timeout 3s
-(define timeout (make-parameter (* 1000 1000 10))) ; 1000ms
-
-(define socket #f)
+(define retries (make-parameter 3)) ; with 1s timeout this makes the max timeout 300ms
+(define timeout (make-parameter (* 1000 1000))) ; 100ms
 
 (define (setup-socket)
-  (set! socket (make-socket 'req))
-  (connect-socket socket "tcp://localhost:4444"))
-(setup-socket)
+  (let ((socket (make-socket 'req)))
+    (connect-socket socket "tcp://localhost:4444")
+    socket))
 
-(define (reconnect)
+(define (reconnect socket)
   (close-socket socket)
   (setup-socket))
 
-(define do-op-mutex (make-mutex))
+(define pool (make-pool
+              (map (lambda (socket) (connect-socket socket "tcp://localhost:4444") socket)
+              `(,(make-socket 'req) ,(make-socket 'req) ,(make-socket 'req) ,(make-socket 'req)))))
+
 (define (do-op op)
-  (handle-exceptions
-   exn
-   (begin (mutex-unlock! do-op-mutex) ; mutex abandoned?
-	  (mutex-lock! do-op-mutex))
-   (mutex-lock! do-op-mutex))
-  (handle-exceptions
-   exn
-   (begin (print-call-chain)
-	  (print-error-message exn)
-	  (print "client error"))
-   (send-message socket (serialize op)))
-  (letrec ((poll-loop
-	    (lambda (timeout retries max-retries)
-	      (if (>= retries max-retries)
-		  (abort 'db-connection-timeout)
-		  (let ((pi `(,(make-poll-item socket in: #t))))
-		    (if (= 0 (poll pi timeout))
-			(begin (reconnect)
-			       (poll-loop timeout (+ retries 1) max-retries))
-			(let ((response (deserialize (receive-message* socket))))
-			  (mutex-unlock! do-op-mutex)
-			  (if (eq? (car response) 'success)
-			      (cadr response)
-			      (begin (print "server-error") (print response) (abort (cdr response)))))))))))
-    (poll-loop (timeout) 0 (retries))))
+  (let ((r
+  (call-with-value-from-pool
+   pool
+   (lambda (socket)
+     (when (not (socket? socket)) (set! socket (setup-socket)))
+     (send-message socket (serialize op))
+     (letrec ((poll-loop
+               (lambda (timeout retries max-retries)
+                 ;(if (>= retries max-retries)
+                     ;(begin (set! socket (reconnect socket)) (abort 'db-connection-timeout))
+                     (let ((pi `(,(make-poll-item socket in: #t))))
+                       (if (= 0 (poll pi timeout))
+                           (begin (print "recon") (set! socket (reconnect socket))
+                                  (if (>= retries max-retries)
+                                      'timeout
+                                      (poll-loop timeout (+ retries 1) max-retries)))
+                           (let ((response (deserialize (receive-message* socket))))
+                             (if (eq? (car response) 'success)
+                                 (cadr response)
+                                 (begin (print "server-error") (print response) (abort (cdr response))))))))));)
+       (poll-loop (timeout) 0 (retries)))))))
+    (if (equal? r 'timeout)
+        (abort 'db-connection-timeout)
+        r)))
 
 (define db:sep (make-parameter "/"))
 
