@@ -165,6 +165,18 @@
 
 (define (pause? query) (string=? query "(pause)"))
 
+(define (log type msg)
+  (send-message log-socket (string-append "[" type "] [db] " (->string msg))))
+
+(define (error-log msg)
+  (log "error" msg))
+
+(define (info-log msg)
+  (log "info" msg))
+
+(define (query-log msg)
+  (info-log (string-append " [query] " msg)))
+
 ;;; close functionality
 
 (define open-db-socket (make-parameter (make-socket 'rep)))
@@ -179,15 +191,22 @@
 (define socket (make-parameter (make-socket 'rep)))
 (bind-socket (socket) "tcp://*:4444")
 
+(define log-socket (make-socket 'pub))
+(connect-socket log-socket "tcp://localhost:11000")
+(info-log "connected")
+
 (define (process-request)
   (handle-exceptions
    exn
-   (begin (send-message (socket) (serialize `(error ,(with-output-to-string (lambda ()
-									      (print-call-chain)
-									      (print-error-message exn)))))))
+   (begin (let ((msg (with-output-to-string (lambda ()
+                                              (print-call-chain)
+                                              (print-error-message exn)))))
+            (error-log msg)
+            (send-message (socket) (serialize `(error ,msg)))))
 					;(with-output-to-file "query-log" (lambda () (print "error")) append:))
    (let ((query (receive-message* (socket))))
-     (with-output-to-file "query-log" (lambda () (print query)) append:)
+     ;(with-output-to-file "query-log" (lambda () (print query)) append:)
+     (query-log (->string query))
      (if (pause? query)
 	 (begin (close-db)
 		(send-message (socket) (serialize `(success "closed")))
