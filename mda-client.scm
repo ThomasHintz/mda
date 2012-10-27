@@ -29,84 +29,104 @@
 
 (module mda-client
   (;; params
-   retries timeout db:sep
+   db:sep
 
    ;; procs
-   db:store db:put-async db:read db:list db:update-list db:remove-from-list db:delete
+   db:store db:read db:list db:update-list db:remove-from-list db:delete
    db:pause
-   serialize deserialize
    )
 
-(import scheme chicken ports srfi-18)
-(use zmq)
+(import scheme chicken ports srfi-13 data-structures)
+(use sqdb srfi-1 srfi-13 srfi-18)
 
-(include "mda-common.scm")
+;;; utils
 
-(define retries (make-parameter (* 3 10))) ; max timeout 3s
-(define timeout (make-parameter (* 1000 1000))) ; 100ms
+(define *sep* "/")
+(define (sep . val)
+  (if (> (length val) 0)
+      (set! *sep* (first val))
+      *sep*))
 
-(define socket #f)
+(define list-index (make-parameter "the-list-index"))
 
-(define (setup-socket)
-  (set! socket (make-socket 'req))
-  (connect-socket socket "tcp://localhost:4444"))
-(setup-socket)
+(define (contains? l e)
+  (not (eq? (filter (lambda (le) (string=? le e)) l) '())))
 
-(define (reconnect)
-  (close-socket socket)
-  (setup-socket))
+(define (dash->space s)
+  (string-fold (lambda (c o) (string-append o (if (char=? #\- c) " " (->string c)))) "" s))
 
-(define do-op-mutex (make-mutex))
-(define (do-op op)
-  (handle-exceptions
-   exn
-   (begin (mutex-unlock! do-op-mutex) ; mutex abandoned?
-	  (mutex-lock! do-op-mutex))
-   (mutex-lock! do-op-mutex))
-  (handle-exceptions
-   exn
-   (begin (print-call-chain)
-	  (print-error-message exn)
-	  (print "client error"))
-   (send-message socket (serialize op)))
-  (letrec ((poll-loop
-	    (lambda (timeout retries max-retries)
-	      (if (>= retries max-retries)
-		  (abort 'db-connection-timeout)
-		  (let ((pi `(,(make-poll-item socket in: #t))))
-		    (if (= 0 (poll pi timeout))
-			(begin (reconnect)
-			       (poll-loop timeout (+ retries 1) max-retries))
-			(let ((response (deserialize (receive-message* socket))))
-			  (mutex-unlock! do-op-mutex)
-			  (if (eq? (car response) 'success)
-			      (cadr response)
-			      (begin (print "server-error") (print response) (abort (cdr response)))))))))))
-    (poll-loop (timeout) 0 (retries))))
+(define (space->dash s)
+  (string-fold (lambda (c o) (string-append o (if (char=? #\space c) "-" (->string c)))) "" s))
+
+(define (id->name id)
+  (string-titlecase (dash->space id)))
+
+(define (name->id name)
+  (string-downcase (space->dash name)))
+
+(define (list->path list)
+  (fold (lambda (e o)
+          (string-append o (sep) e))
+        ""
+        list))
+
+;;; db funcs
+
+(define (do-fetch k v)
+  (letrec
+      ((_ (lambda (i max)
+            (if (> i max)
+                (fetch k v)
+                (handle-exceptions
+                 exn
+                 (begin (thread-sleep! 0.001) (_ (+ i 1) max))
+                 (fetch k v))))))
+    (_ 0 1000)))
+
+(define db (open-database "sqlite-db"))
+(set-busy-timeout! db 2000)
 
 (define db:sep (make-parameter "/"))
 
-(define (db:store v . k)
-  (do-op `(put ,(serialize v) ,@k)))
+(define (db:store data . path-list)
+  (let ((k (name->id (list->path path-list)))
+	(v (with-output-to-string (lambda () (write data)))))
+    (store db k v) #t))
 
-(define (db:put-async v . k) 'not-implemented)
+(define (db:read . path-list)
+  (let ((val (do-fetch db (name->id (list->path path-list)))))
+    (if val
+        (with-input-from-string val (lambda () (read)))
+        'not-found)))
 
-(define (db:read . k)
-  (do-op `(get ,@k)))
+(define (db:list . path-list)
+  (let ((r (apply db:read (append path-list `(,(list-index))))))
+    (if (eq? r 'not-found)
+	'()
+	r)))
 
-(define (db:list . k)
-  (do-op `(db-list ,@k)))
+(define (db:update-list data . path-list)
+  (let* ((p (append path-list `(,(list-index))))
+	 (l (apply db:read p))
+	 (ls (if (eq? l 'not-found) '() l)))
+    (or (contains? ls data) (apply db:store (cons data ls) p))))
 
-(define (db:update-list v . k)
-  (do-op `(update-list ,v ,@k)))
+(define (db:remove-from-list data . path-list)
+  (let* ((p (append path-list `(,(list-index))))
+	 (l (apply db:read p))
+	 (ls (if (eq? l 'not-found) '() l)))
+    (apply db:store
+           (filter (lambda (e)
+                     (not (equal? e data)))
+                   ls)
+           p)))
 
-(define (db:remove-from-list v . k)
-  (do-op `(remove-from-list ,v ,@k)))
-
-(define (db:delete . k)
-  (do-op `(delete ,@k)))
+(define (db:delete . path-list)
+  (let ((k (name->id (list->path path-list))))
+    (delete db k)))
 
 (define (db:pause)
-  (do-op `(pause)))
+  'not-implemented)
+  ;(do-op `(pause)))
 
 )
