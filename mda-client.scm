@@ -72,29 +72,34 @@
 
 ;;; db funcs
 
-(define (do-fetch k v)
+(define (do-fetch db k)
   (letrec
       ((_ (lambda (i max)
             (if (> i max)
-                (fetch k v)
+                (fetch db k)
                 (handle-exceptions
                  exn
                  (begin (thread-sleep! 0.001) (_ (+ i 1) max))
-                 (fetch k v))))))
+                 (fetch db k))))))
     (_ 0 1000)))
 
-(define db (open-database "sqlite-db"))
-(set-busy-timeout! db 2000)
+(define db (make-parameter #f))
+
+(define (setup-db)
+  (db (open-database "sqlite-db"))
+  (set-busy-timeout! (db) 2000))
 
 (define db:sep (make-parameter "/"))
 
 (define (db:store data . path-list)
+  (when (not (db)) (setup-db))
   (let ((k (name->id (list->path path-list)))
 	(v (with-output-to-string (lambda () (write data)))))
-    (store db k v) #t))
+    (store (db) k v) #t))
 
 (define (db:read . path-list)
-  (let ((val (do-fetch db (name->id (list->path path-list)))))
+  (when (not (db)) (setup-db))
+  (let ((val (fetch (db) (name->id (list->path path-list)))))
     (if val
         (with-input-from-string val (lambda () (read)))
         'not-found)))
@@ -122,8 +127,9 @@
            p)))
 
 (define (db:delete . path-list)
+  (when (not (db)) (setup-db))
   (let ((k (name->id (list->path path-list))))
-    (delete db k)))
+    (delete (db) k)))
 
 (define (db:pause)
   'not-implemented)
