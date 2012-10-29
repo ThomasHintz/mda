@@ -45,40 +45,28 @@
 (define retries (make-parameter (* 3 10))) ; max timeout 3s
 (define timeout (make-parameter (* 1000 1000))) ; 100ms
 
-(define socket #f)
+(define socket (make-parameter #f))
 
 (define (setup-socket)
-  (set! socket (make-socket 'req))
-  (connect-socket socket "tcp://localhost:4444"))
-(setup-socket)
+  (socket (make-socket 'req))
+  (connect-socket (socket) "tcp://localhost:4444"))
 
 (define (reconnect)
-  (close-socket socket)
+  (close-socket (socket))
   (setup-socket))
 
-(define do-op-mutex (make-mutex))
 (define (do-op op)
-  (handle-exceptions
-   exn
-   (begin (mutex-unlock! do-op-mutex) ; mutex abandoned?
-	  (mutex-lock! do-op-mutex))
-   (mutex-lock! do-op-mutex))
-  (handle-exceptions
-   exn
-   (begin (print-call-chain)
-	  (print-error-message exn)
-	  (print "client error"))
-   (send-message socket (serialize op)))
+  (when (not (socket)) (setup-socket))
+  (send-message (socket) (serialize op))
   (letrec ((poll-loop
 	    (lambda (timeout retries max-retries)
 	      (if (>= retries max-retries)
 		  (abort 'db-connection-timeout)
-		  (let ((pi `(,(make-poll-item socket in: #t))))
+		  (let ((pi `(,(make-poll-item (socket) in: #t))))
 		    (if (= 0 (poll pi timeout))
 			(begin (reconnect)
 			       (poll-loop timeout (+ retries 1) max-retries))
-			(let ((response (deserialize (receive-message* socket))))
-			  (mutex-unlock! do-op-mutex)
+			(let ((response (deserialize (receive-message* (socket)))))
 			  (if (eq? (car response) 'success)
 			      (cadr response)
 			      (begin (print "server-error") (print response) (abort (cdr response)))))))))))
