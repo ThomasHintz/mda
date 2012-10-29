@@ -7,7 +7,7 @@
 
 (category db)
 
-(needs sqdb)
+(needs tokyocabinet)
 
 (author "Thomas Hintz")
 (synopsis "Client library for tokyocabinet/zmq mda server."))
