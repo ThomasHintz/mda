@@ -15,7 +15,7 @@
     (_ 0 num proc)))
 
 (define (do-test)
-  (do-times 100 test-proc))
+  (do-times 1000 test-proc))
 
 
 (define (range from/to . to)
@@ -31,6 +31,6 @@
             (let ((t (make-thread do-test)))
               (thread-start! t)
               t))
-          (range 100)))
+          (range 1000)))
 
 (print "success")

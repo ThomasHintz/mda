@@ -37,7 +37,7 @@
    )
 
 (import scheme chicken ports srfi-13 data-structures)
-(use sqdb srfi-1 srfi-13 srfi-18)
+(use tokyocabinet srfi-1 srfi-13 srfi-18)
 
 ;;; utils
 
@@ -72,22 +72,12 @@
 
 ;;; db funcs
 
-(define (do-fetch db k)
-  (letrec
-      ((_ (lambda (i max)
-            (if (> i max)
-                (fetch db k)
-                (handle-exceptions
-                 exn
-                 (begin (thread-sleep! 0.001) (_ (+ i 1) max))
-                 (fetch db k))))))
-    (_ 0 1000)))
-
 (define db (make-parameter #f))
+(setup-db)
 
 (define (setup-db)
-  (db (open-database "sqlite-db"))
-  (set-busy-timeout! (db) 2000))
+  (db (tc-hdb-open "ktr-db" flags:
+                   (fx+ TC_HDBONOLCK (fx+ TC_HDBOWRITER (fx+ TC_HDBOREADER TC_HDBOCREAT))))))
 
 (define db:sep (make-parameter "/"))
 
@@ -95,11 +85,11 @@
   (when (not (db)) (setup-db))
   (let ((k (name->id (list->path path-list)))
 	(v (with-output-to-string (lambda () (write data)))))
-    (store (db) k v) #t))
+    (tc-hdb-put! (db) k v) #t))
 
 (define (db:read . path-list)
   (when (not (db)) (setup-db))
-  (let ((val (fetch (db) (name->id (list->path path-list)))))
+  (let ((val (tc-hdb-get (db) (name->id (list->path path-list)))))
     (if val
         (with-input-from-string val (lambda () (read)))
         'not-found)))
@@ -129,7 +119,7 @@
 (define (db:delete . path-list)
   (when (not (db)) (setup-db))
   (let ((k (name->id (list->path path-list))))
-    (delete (db) k)))
+    (tc-hdb-delete! (db) k)))
 
 (define (db:pause)
   'not-implemented)

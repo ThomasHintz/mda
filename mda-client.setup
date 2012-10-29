@@ -2,9 +2,9 @@
 ; email: t@thintz.com
 ; license: bsd
 
-(compile -s -O2 -d1 mda-client.scm -j mda-client)
-(compile -s mda-client.import.scm -O2 -d0)
-(compile -c -O2 -d1 mda-client.scm -unit mda-client -j mda-client)
+(compile -s -O3 -d2 mda-client.scm -j mda-client)
+(compile -s mda-client.import.scm -O3 -d2)
+(compile -c -O3 -d2 mda-client.scm -unit mda-client -j mda-client)
 
 (install-extension
   'mda-client
